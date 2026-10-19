@@ -1,9 +1,14 @@
 #include <raylib.h>
+#include <raymath.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #define CLAY_IMPLEMENTATION
 #include "../libs/clay.h"
 #include "../libs/clay_renderer_raylib.c"
+
+#define NOB_IMPLEMENTATION
+#include "../nob.h"
 
 typedef struct {
     Clay_String title;
@@ -35,29 +40,300 @@ struct {
             CLAY_STRING("Article 4"),
             CLAY_STRING("Article 4"),
         },
-    }
+    },
+    5
 };
 
+size_t selected_document_idx = 0;
+
 const uint32_t FONT_ID_BODY_16 = 0;
+
+void render_header_button(const char* label) {
+    Clay_String text = {
+        true,
+        strlen(label),
+        label,
+    };
+    CLAY_AUTO_ID({
+        .layout = { .padding = {16, 16, 8, 8} },
+        .backgroundColor = { 140, 140, 140, 255 },
+        .cornerRadius = CLAY_CORNER_RADIUS(5),
+    }) {
+        CLAY_TEXT(
+            text,
+            {
+                .fontId = FONT_ID_BODY_16,
+                .fontSize = 16,
+                .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE), 
+            }
+        );
+    }
+}
+
+void render_dropdown_menu_item(const char* label) {
+    Clay_String text = {
+        true,
+        strlen(label),
+        label,
+    };
+    CLAY_AUTO_ID({
+        .layout = { .padding = {16, 16, 8, 8} },
+    }) {
+        CLAY_TEXT(
+            text,
+            {
+                .fontId = FONT_ID_BODY_16,
+                .fontSize = 16,
+                .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE), 
+            }
+        );
+    }
+}
+
+    
+
+void handle_sidebar_interaction(
+    Clay_ElementId element_id,
+    Clay_PointerData pointer_data,
+    void *user_data) {
+    if (pointer_data.state == CLAY_POINTER_DATA_PRESSED_THIS_FRAME) {
+        selected_document_idx = (size_t)user_data;
+    }
+}
 
 void handle_clay_errors(Clay_ErrorData error_data) {
     fprintf(stderr, "%s", error_data.errorText.chars);
 }
 int main(void) {
     Clay_Raylib_Initialize(800, 600, "Intro Clay", FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
-    Font fonts[1] = { [FONT_ID_BODY_16] = LoadFontEx("../resources/SarasaMonoTC-Regular.ttf", 48, 0, 400) };
+    Font fonts[1] = { [FONT_ID_BODY_16] = LoadFontEx("./resources/SarasaMonoTC-Regular.ttf", 32, 0, 400) };
     SetTextureFilter(fonts[FONT_ID_BODY_16].texture, TEXTURE_FILTER_BILINEAR);
 
-    uint64_t clay_required_memory = Clay_MinMemorySize();
-    Clay_Arena clay_arena = Clay_CreateArenaWithCapacityAndMemory(clay_required_memory, malloc(clay_required_memory));
-    Clay_Context *ctx = Clay_Initialize(clay_arena, (Clay_Dimensions) {.width = GetScreenWidth(), .height = GetScreenHeight()}, (Clay_ErrorHandler) {handle_clay_errors});
+    uint64_t clay_min_memory_size = Clay_MinMemorySize();
+    Clay_Arena clay_arena = Clay_CreateArenaWithCapacityAndMemory(clay_min_memory_size, malloc(clay_min_memory_size));
+    Clay_Initialize(
+        clay_arena,
+        (Clay_Dimensions) {
+            .width = GetScreenWidth(),
+            .height = GetScreenHeight()
+        },
+        (Clay_ErrorHandler) {handle_clay_errors}
+    );
     Clay_SetMeasureTextFunction(Raylib_MeasureText, fonts);
+    Clay_SetDebugModeEnabled(true);
 
+    SetTargetFPS(60);
     while(!WindowShouldClose()) {
-        Clay_RenderCommandArray render_command;
+        float dt = GetFrameTime();
+        // Run once per frame
+        Clay_SetLayoutDimensions(
+            (Clay_Dimensions){
+                GetScreenWidth(),
+                GetScreenHeight(),
+            }
+        );
+
+        Vector2 mouse_position = GetMousePosition();
+        Vector2 scroll_delta = Vector2Scale(GetMouseWheelMoveV(), 4);
+
+        Clay_SetPointerState(
+            RAYLIB_VEC2_TO_CLAY_VEC2(mouse_position),
+            IsMouseButtonDown(0)
+        );
+
+        Clay_UpdateScrollContainers(
+            true,
+            RAYLIB_VEC2_TO_CLAY_VEC2(scroll_delta),
+            dt
+        );
+
+        Clay_Sizing layout_expand = {
+            CLAY_SIZING_GROW(0),
+            CLAY_SIZING_GROW(0),
+        };
+
+        #define DEFAULT_PANEL_STYLE \
+            .backgroundColor = {90, 90,90, 255},\
+            .cornerRadius = CLAY_CORNER_RADIUS(8),
+            
+
+        Clay_BeginLayout();
+        // Build UI here
+        CLAY(
+            CLAY_ID("outer_container"),
+            {
+                .backgroundColor = {43, 41,51, 255},
+                .layout = {
+                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                    .sizing = layout_expand,
+                    .padding = {16,16,16,16},
+                    .childGap = 16,
+                },
+            }
+        ) {
+            CLAY(
+                CLAY_ID("header_bar"),
+                {
+                    DEFAULT_PANEL_STYLE
+                    .layout = {
+                        .sizing = {
+                            CLAY_SIZING_GROW(0.0),
+                            CLAY_SIZING_FIXED(69),
+                        },
+                        .padding = CLAY_PADDING_ALL(16),
+                        .childGap = 16,
+                        .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+                    }
+                }
+            ) {
+                // render_header_button("File");
+                CLAY(CLAY_ID("file_button"), {
+                    .layout = { .padding = {16, 16, 8, 8} },
+                    .backgroundColor = { 140, 140, 140, 255 },
+                    .cornerRadius = CLAY_CORNER_RADIUS(5),
+                }) {
+                    CLAY_TEXT(
+                        CLAY_STRING("File"),
+                        {
+                            .fontId = FONT_ID_BODY_16,
+                            .fontSize = 16,
+                            .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE), 
+                        }
+                    );
+                    bool file_menu_visible =
+                        Clay_PointerOver(
+                            Clay_GetElementId(CLAY_STRING("file_button"))
+                        ) || 
+                        Clay_PointerOver(
+                            Clay_GetElementId(CLAY_STRING("file_menu"))
+                        ); 
+                    if (file_menu_visible) {
+                        CLAY(
+                            CLAY_ID("file_menu"),
+                            {
+                                .floating = {
+                                    .attachTo = CLAY_ATTACH_TO_PARENT,
+                                    .attachPoints = { .parent = CLAY_ATTACH_POINT_LEFT_BOTTOM },
+                                    .offset = {.y = 8},
+                                },
+                                .backgroundColor = {40, 40, 40, 255 },
+                                .layout = {
+                                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                                    .sizing = { .width = CLAY_SIZING_FIXED(200) },
+                                },
+                                .cornerRadius = 4,
+                            }
+                        ) {
+                            render_dropdown_menu_item("New");
+                            render_dropdown_menu_item("Open");
+                            render_dropdown_menu_item("Close");
+                        }
+                    }
+                }
+                render_header_button("Edit");
+                CLAY_AUTO_ID({.layout = {.sizing = CLAY_SIZING_GROW(0)}});
+                render_header_button("Upload");
+                render_header_button("Media");
+                render_header_button("Support");
+            }
+
+            CLAY(
+                 CLAY_ID("lower_content"),
+                 {
+                    // DEFAULT_PANEL_STYLE
+                    .layout = {
+                        .layoutDirection = CLAY_LEFT_TO_RIGHT,
+                        .sizing = layout_expand,
+                        .childGap = 16,
+                    },
+                }
+             ) {
+                CLAY(
+                    CLAY_ID("sidebar"),
+                    {
+                        DEFAULT_PANEL_STYLE
+                        .layout = {
+                            .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                            .sizing = {
+                                CLAY_SIZING_FIXED(250),
+                                CLAY_SIZING_GROW(0.0),
+                            },
+                            .childGap = 8,
+                            .padding = CLAY_PADDING_ALL(16),
+                        }
+                    }
+                ){
+                    for (size_t i = 0; i < documents.count; ++i) {
+                        Document doc = documents.items[i];
+
+                        Clay_LayoutConfig sidebar_button_layout = {
+                            .padding = CLAY_PADDING_ALL(16),
+                            .sizing = { .width = CLAY_SIZING_GROW(0) },
+                        };
+                        
+                        if (i == selected_document_idx) {
+                            CLAY_AUTO_ID({
+                                .layout = sidebar_button_layout,
+                                .cornerRadius = 8,
+                                .backgroundColor = {120, 120, 120, 255},
+                            }) {
+                                CLAY_TEXT(doc.title, {
+                                    .fontId = FONT_ID_BODY_16,
+                                    .fontSize = 16,
+                                    .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),  
+                                });  
+                            }
+                        } else {
+                            CLAY_AUTO_ID({
+                                .layout = sidebar_button_layout,
+                                .cornerRadius = 8,
+                                .backgroundColor = (Clay_Color){120, 120, 120, Clay_Hovered() ? 120 : 0},
+                            }) {
+                                Clay_OnHover(handle_sidebar_interaction, (void*) i);
+                                CLAY_TEXT(doc.title, {
+                                    .fontId = FONT_ID_BODY_16,
+                                    .fontSize = 16,
+                                    .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),  
+                                });  
+                            }
+                        }
+                    }
+                }
+                CLAY(
+                    CLAY_ID("main_content"),
+                    {
+                        DEFAULT_PANEL_STYLE
+                        .layout = {
+                            .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                            .sizing = layout_expand,
+                            .childGap = 16,
+                            .padding = CLAY_PADDING_ALL(16),
+                        },
+                        .clip = {
+                            .vertical = true,
+                            .childOffset = Clay_GetScrollOffset(),
+                        }
+                    }
+                ){
+                    Document selected_doc = documents.items[selected_document_idx];
+                    CLAY_TEXT(selected_doc.title, {
+                        .fontId = FONT_ID_BODY_16,
+                        .fontSize = 24,
+                        .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),              
+                    });
+                    CLAY_TEXT(selected_doc.contents, {
+                        .fontId = FONT_ID_BODY_16,
+                        .fontSize = 18,
+                        .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),              
+                    });
+                }
+            }
+        };
+
+        Clay_RenderCommandArray render_commands = Clay_EndLayout(dt);
         BeginDrawing();
         ClearBackground(BLACK);
-        // Clay_Raylib_Render(Clay_RenderCommandArray renderCommands, Font *fonts)
+        Clay_Raylib_Render(render_commands, fonts);
         EndDrawing();
     }
 }

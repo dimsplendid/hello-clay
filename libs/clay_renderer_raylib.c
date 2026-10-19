@@ -5,9 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define CLAY_RECTANGLE_TO_RAYLIB_RECTANGLE(rectangle) (Rectangle) { .x = rectangle.x, .y = rectangle.y, .width = rectangle.width, .height = rectangle.height }
 #define CLAY_COLOR_TO_RAYLIB_COLOR(color) (Color) { .r = (unsigned char)roundf(color.r), .g = (unsigned char)roundf(color.g), .b = (unsigned char)roundf(color.b), .a = (unsigned char)roundf(color.a) }
 #define RAYLIB_COLOR_TO_CLAY_COLOR(color) (Clay_Color) {.r = (float)color.r, .g = (float)color.g, .b = (float)color.b, .a = (float)color.a}
+#define RAYLIB_VEC2_TO_CLAY_VEC2(vec2) (Clay_Vector2) {vec2.x, vec2.y}
 
 Camera Raylib_camera;
 
