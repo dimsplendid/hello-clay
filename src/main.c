@@ -96,6 +96,7 @@ void handle_sidebar_interaction(
     Clay_ElementId element_id,
     Clay_PointerData pointer_data,
     void *user_data) {
+    UNUSED(element_id);
     if (pointer_data.state == CLAY_POINTER_DATA_PRESSED_THIS_FRAME) {
         selected_document_idx = (size_t)user_data;
     }
@@ -221,7 +222,7 @@ int main(void) {
                                     .layoutDirection = CLAY_TOP_TO_BOTTOM,
                                     .sizing = { .width = CLAY_SIZING_FIXED(200) },
                                 },
-                                .cornerRadius = 4,
+                                .cornerRadius = CLAY_CORNER_RADIUS(4),
                             }
                         ) {
                             render_dropdown_menu_item("New");
@@ -231,7 +232,7 @@ int main(void) {
                     }
                 }
                 render_header_button("Edit");
-                CLAY_AUTO_ID({.layout = {.sizing = CLAY_SIZING_GROW(0)}});
+                CLAY_AUTO_ID({.layout = {.sizing = {.width = CLAY_SIZING_GROW(0)}}});
                 render_header_button("Upload");
                 render_header_button("Media");
                 render_header_button("Support");
@@ -274,7 +275,7 @@ int main(void) {
                         if (i == selected_document_idx) {
                             CLAY_AUTO_ID({
                                 .layout = sidebar_button_layout,
-                                .cornerRadius = 8,
+                                .cornerRadius = CLAY_CORNER_RADIUS(8),
                                 .backgroundColor = {120, 120, 120, 255},
                             }) {
                                 CLAY_TEXT(doc.title, {
@@ -286,7 +287,7 @@ int main(void) {
                         } else {
                             CLAY_AUTO_ID({
                                 .layout = sidebar_button_layout,
-                                .cornerRadius = 8,
+                                .cornerRadius = CLAY_CORNER_RADIUS(8),
                                 .backgroundColor = (Clay_Color){120, 120, 120, Clay_Hovered() ? 120 : 0},
                             }) {
                                 Clay_OnHover(handle_sidebar_interaction, (void*) i);
