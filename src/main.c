@@ -43,7 +43,6 @@ const uint32_t FONT_ID_BODY_16 = 0;
 void handle_clay_errors(Clay_ErrorData error_data) {
     fprintf(stderr, "%s", error_data.errorText.chars);
 }
-
 int main(void) {
     Clay_Raylib_Initialize(800, 600, "Intro Clay", FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
     Font fonts[1] = { [FONT_ID_BODY_16] = LoadFontEx("../resources/SarasaMonoTC-Regular.ttf", 48, 0, 400) };
@@ -52,5 +51,13 @@ int main(void) {
     uint64_t clay_required_memory = Clay_MinMemorySize();
     Clay_Arena clay_arena = Clay_CreateArenaWithCapacityAndMemory(clay_required_memory, malloc(clay_required_memory));
     Clay_Context *ctx = Clay_Initialize(clay_arena, (Clay_Dimensions) {.width = GetScreenWidth(), .height = GetScreenHeight()}, (Clay_ErrorHandler) {handle_clay_errors});
+    Clay_SetMeasureTextFunction(Raylib_MeasureText, fonts);
 
+    while(!WindowShouldClose()) {
+        Clay_RenderCommandArray render_command;
+        BeginDrawing();
+        ClearBackground(BLACK);
+        // Clay_Raylib_Render(Clay_RenderCommandArray renderCommands, Font *fonts)
+        EndDrawing();
+    }
 }
