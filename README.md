@@ -23,7 +23,7 @@ int main(void) {
     ...
 }
 ```
-- Add CJK words wrap function
+- Add CJK words wrap function to `libs/clay.h`, simply make a Kanji a word :D, not sure is this would cause performance impact.
   ![](demo/demo-1.png)
 
 ## TODO
