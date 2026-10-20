@@ -13,7 +13,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "../nob.h"
 
 // SIMD includes on supported platforms
 #if !defined(CLAY_DISABLE_SIMD) && (defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64))
@@ -161,6 +160,8 @@ static inline void Clay__SuppressUnusedLatchDefinitionVariableWarning(void) { (v
 #define CLAY__CONFIG_WRAPPER(type, ...) (CLAY__INIT(CLAY__WRAPPER_TYPE(type)) { __VA_ARGS__ }).wrapped
 
 #define CLAY_TEXT(text, ...) Clay__OpenTextElement(text, CLAY__CONFIG_WRAPPER(Clay_TextElementConfig, __VA_ARGS__))
+
+#define CLAY_UNUSED(value) (void)(value)
 
 #ifdef __cplusplus
 
@@ -659,6 +660,29 @@ typedef struct Clay_TextRenderData {
     // The height of the bounding box for this line of text.
     uint16_t lineHeight;
 } Clay_TextRenderData;
+
+
+// add unicode support for CJK
+typedef enum {
+    CLAY_UNICODE_ASCII,
+    CLAY_UNICODE_GENERAL_PUNCTUATION,
+    CLAY_UNICODE_ARROWS,
+    CLAY_UNICODE_CJK,
+    CLAY_UNICODE_HALFWIDTH_AND_FULL_WIDTH_FORMS,
+} Clay_UnicodeBlock;
+
+typedef struct {
+    int begin;
+    int end;
+} Clay_UnicodeRange;
+
+const Clay_UnicodeRange CLAY_UNICODE_BLOCKS[] = {
+    [CLAY_UNICODE_ASCII                         ] = {0x0000, 0x0080},
+    [CLAY_UNICODE_GENERAL_PUNCTUATION           ] = {0x2000, 0x2070},
+    [CLAY_UNICODE_ARROWS                        ] = {0x2190, 0x2200},
+    [CLAY_UNICODE_CJK                           ] = {0x3000, 0xA000},
+    [CLAY_UNICODE_HALFWIDTH_AND_FULL_WIDTH_FORMS] = {0xFF00, 0xFFF0},
+};
 
 // Render command data when commandType == CLAY_RENDER_COMMAND_TYPE_RECTANGLE
 typedef struct Clay_RectangleRenderData {
@@ -1637,6 +1661,47 @@ Clay__MeasuredWord *Clay__AddMeasuredWord(Clay__MeasuredWord word, Clay__Measure
     }
 }
 
+
+// copy from raylib :D
+int Clay_GetCodepointNext(const char *text, int *codepointSize)
+{
+    const char *ptr = text;
+    int codepoint = 0x3F;       // Codepoint (defaults to '?')
+    *codepointSize = 1;
+    if (ptr == NULL) return codepoint;
+
+    // Get current codepoint and bytes processed
+    if (0xf0 == (0xf8 & ptr[0]))
+    {
+        // 4 byte UTF-8 codepoint
+        if (((ptr[1] & 0xC0) ^ 0x80) || ((ptr[2] & 0xC0) ^ 0x80) || ((ptr[3] & 0xC0) ^ 0x80)) { return codepoint; } // 10xxxxxx checks
+        codepoint = ((0x07 & ptr[0]) << 18) | ((0x3F & ptr[1]) << 12) | ((0x3F & ptr[2]) << 6) | (0x3F & ptr[3]);
+        *codepointSize = 4;
+    }
+    else if (0xE0 == (0xF0 & ptr[0]))
+    {
+        // 3 byte UTF-8 codepoint */
+        if (((ptr[1] & 0xC0) ^ 0x80) || ((ptr[2] & 0xC0) ^ 0x80)) { return codepoint; } // 10xxxxxx checks
+        codepoint = ((0x0F & ptr[0]) << 12) | ((0x3F & ptr[1]) << 6) | (0x3F & ptr[2]);
+        *codepointSize = 3;
+    }
+    else if (0xC0 == (0xE0 & ptr[0]))
+    {
+        // 2 byte UTF-8 codepoint
+        if ((ptr[1] & 0xC0) ^ 0x80) { return codepoint; } // 10xxxxxx checks
+        codepoint = ((0x1F & ptr[0]) << 6) | (0x3F & ptr[1]);
+        *codepointSize = 2;
+    }
+    else if (0x00 == (0x80 & ptr[0]))
+    {
+        // 1 byte UTF-8 codepoint
+        codepoint = ptr[0];
+        *codepointSize = 1;
+    }
+
+    return codepoint;
+}
+
 Clay__MeasureTextCacheItem *Clay__MeasureTextCached(Clay_String *text, Clay_TextElementConfig *config) {
     Clay_Context* context = Clay_GetCurrentContext();
     #ifndef CLAY_WASM
@@ -1730,7 +1795,14 @@ Clay__MeasureTextCacheItem *Clay__MeasureTextCached(Clay_String *text, Clay_Text
             return &Clay__MeasureTextCacheItem_DEFAULT;
         }
         char current = text->chars[end];
-        if (current == ' ' || current == '\n') {
+
+        int charLen = 1;
+        uint32_t codepoint = Clay_GetCodepointNext(&text->chars[end], &charLen);
+        bool isCJK =
+            ((codepoint >= CLAY_UNICODE_BLOCKS[CLAY_UNICODE_CJK].begin) && (codepoint < CLAY_UNICODE_BLOCKS[CLAY_UNICODE_CJK].end)) || 
+            ((codepoint >= CLAY_UNICODE_BLOCKS[CLAY_UNICODE_HALFWIDTH_AND_FULL_WIDTH_FORMS].begin) && (codepoint < CLAY_UNICODE_BLOCKS[CLAY_UNICODE_HALFWIDTH_AND_FULL_WIDTH_FORMS].end));
+        
+        if (current == ' ' || current == '\n' || isCJK) {
             int32_t length = end - start;
             Clay_Dimensions dimensions = CLAY__DEFAULT_STRUCT;
             if (length > 0) {
@@ -1753,9 +1825,16 @@ Clay__MeasureTextCacheItem *Clay__MeasureTextCached(Clay_String *text, Clay_Text
                 measured->containsNewlines = true;
                 lineWidth = 0;
             }
-            start = end + 1;
+            if (isCJK) {
+                Clay_Dimensions cjkDimensions = Clay__MeasureText(CLAY__INIT(Clay_StringSlice) {.length = charLen, .chars = &text->chars[end], .baseChars = text->chars}, config, context->measureTextUserData);
+                measured->minWidth = CLAY__MAX(cjkDimensions.width, measured->minWidth);
+                measuredHeight = CLAY__MAX(measuredHeight, cjkDimensions.height);
+                previousWord = Clay__AddMeasuredWord(CLAY__INIT(Clay__MeasuredWord) { .startOffset = end, .length = charLen, .width = cjkDimensions.width, .next = -1 }, previousWord);
+                lineWidth += cjkDimensions.width;
+            }
+            start = end + charLen;
         }
-        end++;
+        end += charLen;
     }
     if (end - start > 0) {
         Clay_Dimensions dimensions = Clay__MeasureText(CLAY__INIT(Clay_StringSlice) { .length = end - start, .chars = &text->chars[start], .baseChars = text->chars }, config, context->measureTextUserData);
@@ -2280,7 +2359,7 @@ Clay_SizingAxis Clay__GetElementSizing(Clay_LayoutElement* element, bool xAxis) 
 
 // Writes out the location of text elements to layout elements buffer 1
 void Clay__SizeContainersAlongAxis(bool xAxis, float deltaTime, Clay__int32_tArray* textElementsOut, Clay__int32_tArray* aspectRatioElementsOut) {
-    UNUSED(deltaTime);
+    CLAY_UNUSED(deltaTime);
     Clay_Context* context = Clay_GetCurrentContext();
     Clay__int32_tArray bfsBuffer = context->layoutElementChildrenBuffer;
     Clay__int32_tArray resizableContainerBuffer = context->openLayoutElementStack;
@@ -3141,7 +3220,7 @@ void Clay__CalculateFinalLayout(float deltaTime, bool useStoredBoundingBoxes, bo
             for (int32_t i = 0; i < currentElement->children.length; ++i) {
                 Clay_LayoutElement *childElement = Clay_LayoutElementArray_Get(&context->layoutElements, currentElement->children.elements[i]);
                 Clay_LayoutElementHashMapItem* childMapItem = Clay__GetHashMapItem(childElement->id);
-                UNUSED(childMapItem);
+                CLAY_UNUSED(childMapItem);
                 // Alignment along non layout axis
                 if (layoutConfig->layoutDirection == CLAY_LEFT_TO_RIGHT) {
                     currentElementTreeNode->nextChildOffset.y = currentElement->config.layout.padding.top;
@@ -3477,7 +3556,7 @@ void Clay__RenderDebugLayoutSizing(Clay_SizingAxis sizing, Clay_TextElementConfi
 }
 
 void Clay__DebugViewRenderElementConfigHeader(Clay_String elementId, Clay__DebugElementConfigType type) {
-    UNUSED(elementId);
+    CLAY_UNUSED(elementId);
     Clay__DebugElementConfigTypeLabelConfig config = Clay__DebugGetElementConfigTypeLabel(type);
     Clay_Color backgroundColor = config.color;
     backgroundColor.a = 90;
@@ -4383,7 +4462,7 @@ void Clay__CloneElementsWithExitTransition() {
     for (int i = 0; i < context->transitionDatas.length; ++i) {
         Clay__TransitionDataInternal *data = Clay__TransitionDataInternalArray_Get(&context->transitionDatas, i);
         Clay_TransitionElementConfig* config = &data->elementThisFrame->config.transition;
-        UNUSED(config);
+        CLAY_UNUSED(config);
         if (data->transitionOut) {
             Clay__int32_tArray bfsBuffer = context->openLayoutElementStack;
             bfsBuffer.length = 0;
@@ -4401,7 +4480,7 @@ void Clay__CloneElementsWithExitTransition() {
                     Clay_LayoutElement* childElement = Clay_LayoutElementArray_GetCheckCapacity(&context->layoutElements, layoutElement->children.elements[j]);
                     Clay__int32_tArray_Add(&bfsBuffer, nextIndex);
                     Clay_LayoutElement* newChildElement = Clay_LayoutElementArray_Set_DontTouchLength(&context->layoutElements, nextIndex, *childElement);
-                    UNUSED(newChildElement);
+                    CLAY_UNUSED(newChildElement);
                     Clay__StringArray_Set_DontTouchLength(&context->layoutElementIdStrings, nextIndex, *Clay__StringArray_GetCheckCapacity(&context->layoutElementIdStrings, childElement - context->layoutElements.internalArray));
                     Clay__int32_tArray_Set_DontTouchLength(&context->layoutElementChildren, nextChildIndex, nextIndex);
                     nextIndex--;

@@ -16,7 +16,7 @@ typedef struct {
 } Document;
 
 struct {
-    Document items[5];
+    Document items[6];
     size_t count;    
 } documents = {
     {
@@ -37,14 +37,18 @@ struct {
             CLAY_STRING("Article 3"),
         },
         {
-            CLAY_STRING("Article 4"),
-            CLAY_STRING("Article 4"),
+            CLAY_STRING("中文測試"),
+            CLAY_STRING("。在某種意義上，這張臉對我來說或許是最熟悉的。畢竟是從前世就認識的面孔。雖然宇宙小姐原本試圖游刃有餘地運用這三張面孔，並隱約隱藏自己的身分，但可惜在所有事情都向我露餡後，她似乎也死心認栽了。「總覺得平日不去學校反而請假，會有一種罪惡感呢。」事實上，既然從事著有支領薪水的 Vtuber 這份工作，我已經私下向導師說明過情況。幸運的是，導師對 Vtuber 業界並不了解，我不需要擔心身分曝光的問題，但事先也打過招呼說「可能會因為工作而請假」。也因為這層鋪墊，這次的請假申請通過得很順利。「唔唔，雖然是被叫過來的，但還是有罪惡感啊……這應該不算『無故蹺課』吧。」我一邊胡思亂想著，一邊往事務所移動。感覺有些緊張。普羅米恩斯小姐的事，最清楚的人恐怕就是宇宙小姐了。雖然表面上看來沒什麼往來，但既然是同期，勢必有很多必須交涉的機會。而且，我有種感覺，宇宙小姐似乎也在尋求救贖。在尋找著，那個能拯救普羅米恩斯小姐的人。我不知道自己能不能成為那個人。我並沒有自大到覺得能實現「拯救所有人」這種大言不慚的豪語。不，我辦不到。正因如此，我不確定自己能否回應宇宙小姐的期待。可是啊，如果還沒試過就說「辦不到」，我覺得還太早了。不盲目自信。但是，我會傾盡所能。為了達到目標，我也會尋求他人的幫助。如果這能通往幸福。——為了攻略她們。我的貪婪是可以永無止盡的。"),
+        },
+        {
+            CLAY_STRING("中文 debug"),
+            CLAY_STRING("這一章展現了兩位同樣具備冷靜分析能力的人——花依琥珀與宇宙空，如何為了拯救共同的同伴而展開對話。宇宙空身為「三面一體」的角色，其帶來的情報無疑是解開普羅米恩斯心防的關鍵\n：老師、秘書與前輩宇宙小姐擁有三張面孔。第一張是身為歌唱老師的面孔。如各位所知，她以指導過我、對我有大恩的老師身分與我相處。第二張是社長秘書的模樣。這張臉孔……是透過某些狀況與推測才查明的。雖然我對這位輔佐謎團重重的社長、身為唯一秘書的人並非不感興趣，但暫時沒有手段深入了解，只能先擱在一邊。第三張則是「肥溜め」一期生，宇宙空（Uchuu Sora）的面孔"),
         },
     },
-    5
+    6
 };
 
-size_t selected_document_idx = 0;
+size_t selected_document_idx = 5;
 
 const uint32_t FONT_ID_BODY_16 = 0;
 
@@ -105,9 +109,30 @@ void handle_sidebar_interaction(
 void handle_clay_errors(Clay_ErrorData error_data) {
     fprintf(stderr, "%s", error_data.errorText.chars);
 }
+
+Font load_font(char *file_name) {
+
+    struct {
+        int *items;
+        size_t count;
+        size_t capacity;
+    } code_points = {0};
+
+    for (size_t i = 0; i < ARRAY_LEN(CLAY_UNICODE_BLOCKS); ++i) {
+        Clay_UnicodeRange range = CLAY_UNICODE_BLOCKS[i];
+        for (size_t j = range.begin; j < range.end; ++j) {
+            da_append(&code_points, j);
+        }
+    }
+
+    Font font = LoadFontEx(file_name, 32, code_points.items, code_points.count);
+    da_free(code_points);
+    return font;
+}
+
 int main(void) {
     Clay_Raylib_Initialize(800, 600, "Intro Clay", FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI | FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT);
-    Font fonts[1] = { [FONT_ID_BODY_16] = LoadFontEx("./resources/SarasaMonoTC-Regular.ttf", 32, 0, 400) };
+    Font fonts[1] = { [FONT_ID_BODY_16] = load_font("./resources/SarasaMonoTC-Regular.ttf") };
     SetTextureFilter(fonts[FONT_ID_BODY_16].texture, TEXTURE_FILTER_BILINEAR);
 
     uint64_t clay_min_memory_size = Clay_MinMemorySize();
@@ -120,8 +145,9 @@ int main(void) {
         },
         (Clay_ErrorHandler) {handle_clay_errors}
     );
-    Clay_SetMeasureTextFunction(Raylib_MeasureText, fonts);
-    Clay_SetDebugModeEnabled(true);
+    // Clay_SetMeasureTextFunction(Raylib_MeasureText, fonts);
+    Clay_SetMeasureTextFunction(Raylib_MeasureTextUnicode, fonts);
+    // Clay_SetDebugModeEnabled(true);
 
     SetTargetFPS(60);
     while(!WindowShouldClose()) {
@@ -268,7 +294,7 @@ int main(void) {
                         Document doc = documents.items[i];
 
                         Clay_LayoutConfig sidebar_button_layout = {
-                            .padding = CLAY_PADDING_ALL(16),
+                            .padding = CLAY_PADDING_ALL(8),
                             .sizing = { .width = CLAY_SIZING_GROW(0) },
                         };
                         
@@ -280,7 +306,7 @@ int main(void) {
                             }) {
                                 CLAY_TEXT(doc.title, {
                                     .fontId = FONT_ID_BODY_16,
-                                    .fontSize = 16,
+                                    .fontSize = 20,
                                     .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),  
                                 });  
                             }
@@ -293,7 +319,7 @@ int main(void) {
                                 Clay_OnHover(handle_sidebar_interaction, (void*) i);
                                 CLAY_TEXT(doc.title, {
                                     .fontId = FONT_ID_BODY_16,
-                                    .fontSize = 16,
+                                    .fontSize = 20,
                                     .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),  
                                 });  
                             }
@@ -326,6 +352,7 @@ int main(void) {
                         .fontId = FONT_ID_BODY_16,
                         .fontSize = 18,
                         .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),              
+                        .wrapMode = CLAY_TEXT_WRAP_WORDS,
                     });
                 }
             }

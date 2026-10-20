@@ -1,9 +1,15 @@
+#ifndef CLAY_RENDER_RAYLIB_H_
+#define CLAY_RENDER_RAYLIB_H_
+
 #include <raylib.h>
 #include <raymath.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "clay.h"
+#include "../nob.h"
 
 #define CLAY_COLOR_TO_RAYLIB_COLOR(color) (Color) { .r = (unsigned char)roundf(color.r), .g = (unsigned char)roundf(color.g), .b = (unsigned char)roundf(color.b), .a = (unsigned char)roundf(color.a) }
 #define RAYLIB_COLOR_TO_CLAY_COLOR(color) (Clay_Color) {.r = (float)color.r, .g = (float)color.g, .b = (float)color.b, .a = (float)color.a}
@@ -173,6 +179,32 @@ static inline Clay_Dimensions Raylib_MeasureText(Clay_StringSlice text, Clay_Tex
     return textSize;
 }
 
+
+static inline Clay_Dimensions Raylib_MeasureTextUnicode(
+    Clay_StringSlice text,
+    Clay_TextElementConfig *config,
+    void *user_data
+) {
+    if (text.length == 0 || text.chars == NULL) return (Clay_Dimensions) {0};
+    
+    Font *fonts = (Font*)user_data;
+    Font font = fonts[config->fontId];
+    float font_size = config->fontSize;
+    float font_spacing = config->letterSpacing;
+    
+    if (!font.glyphs) font = GetFontDefault(); // load font file fail, rollback to use default font
+
+    String_Builder sb = {0};
+    sb_append_buf(&sb, text.chars, text.length);
+    sb_append_null(&sb);
+    
+    Vector2 font_measurement = MeasureTextEx(font, sb.items, font_size, font_spacing);
+
+    da_free(sb);
+
+    return (Clay_Dimensions){font_measurement.x, font_measurement.y};
+}
+
 void Clay_Raylib_Initialize(int width, int height, const char *title, unsigned int flags) {
     SetConfigFlags(flags);
     InitWindow(width, height, title);
@@ -320,3 +352,4 @@ void Clay_Raylib_Render(Clay_RenderCommandArray renderCommands, Font* fonts)
         }
     }
 }
+#endif // CLAY_RENDER_RAYLIB_H_
