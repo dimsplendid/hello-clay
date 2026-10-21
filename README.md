@@ -8,7 +8,7 @@ Test project for learning Clay 🤓.
 
 Using `nob.h` created by tsoding
 > https://github.com/tsoding/nob.h
-> Just test on Windows with msys64 now, the nob.c need modify environment in differect OS.
+> Just test on Windows with msys64 and MacOS with brew, the nob.c need modify environment in differect OS.
 
 ```bash
 $ clang nob.c -o nob.exe # kick off, only need once
