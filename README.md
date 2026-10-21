@@ -6,9 +6,9 @@ Test project for learning Clay 🤓.
 
 ## Start Up
 
-Using `nob.h` created by tsoding
+Using `nob.h` created by tsoding.
 > https://github.com/tsoding/nob.h
-> Just test on Windows with msys64 now, the nob.c need modify environment in differect OS.
+> Just test on Windows with msys64 now, the nob.c need modify environments in different PC.
 
 ```bash
 $ clang nob.c -o nob.exe # kick off, only need once
@@ -28,8 +28,11 @@ int main(void) {
 ```
 - Add CJK words wrap function to `libs/clay.h`, simply make a Kanji a word :D, not sure is this would cause performance impact.
   ![](demo/demo-1.png)
+  > I watch the task manager and it is increasing the usage when showing kanji.
 
 ## TODO
 
-- There's bugs in CJK wrap, sometimes it would show `??`. Though I think it's unicode cutting issue, I still not found the problems.
+- There's bugs in CJK wrap, sometimes it would show `??`. Though I check the out is unicode cutting issue, I still not found where's the problems.
   ![](demo/demo-bug.png)
+- Try to reduce the performance impact by CJK.
+- Add simple game and interact with UI.
