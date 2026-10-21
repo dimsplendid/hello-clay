@@ -18,8 +18,13 @@ void cc(Cmd *cmd) {
 }
 
 void libs(Cmd *cmd){
+#ifdef _WIN32
     cmd_append(cmd, "-IC:/msys64/ucrt64/include"); 
     cmd_append(cmd, "-LC:/msys64/ucrt64/lib");
+#elif __APPLE__
+    cmd_append(cmd, "-I/opt/homebrew/Cellar/raylib/6.0/include");
+    cmd_append(cmd, "-L/opt/homebrew/Cellar/raylib/6.0/lib");
+#endif // _WIN32
     cmd_append(cmd, "-lraylib");
 }
 
