@@ -210,6 +210,10 @@ int main(void) {
                         .padding = CLAY_PADDING_ALL(16),
                         .childGap = 16,
                         .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+                    },
+                    .clip = {
+                        .horizontal = true,
+                        .childOffset = Clay_GetScrollOffset(),
                     }
                 }
             ) {
@@ -287,6 +291,10 @@ int main(void) {
                             },
                             .childGap = 8,
                             .padding = CLAY_PADDING_ALL(16),
+                        },
+                        .clip = {
+                            .vertical = true,
+                            .childOffset = Clay_GetScrollOffset(),
                         }
                     }
                 ){
