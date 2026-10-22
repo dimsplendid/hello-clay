@@ -182,7 +182,6 @@ int main(void) {
         #define DEFAULT_PANEL_STYLE \
             .backgroundColor = {90, 90,90, 255},\
             .cornerRadius = CLAY_CORNER_RADIUS(8),
-            
 
         Clay_BeginLayout();
         // Build UI here
@@ -305,7 +304,7 @@ int main(void) {
                             .padding = CLAY_PADDING_ALL(8),
                             .sizing = { .width = CLAY_SIZING_GROW(0) },
                         };
-                        
+
                         if (i == selected_document_idx) {
                             CLAY_AUTO_ID({
                                 .layout = sidebar_button_layout,
@@ -315,8 +314,8 @@ int main(void) {
                                 CLAY_TEXT(doc.title, {
                                     .fontId = FONT_ID_BODY_16,
                                     .fontSize = 20,
-                                    .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),  
-                                });  
+                                    .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),
+                                });
                             }
                         } else {
                             CLAY_AUTO_ID({
@@ -328,8 +327,8 @@ int main(void) {
                                 CLAY_TEXT(doc.title, {
                                     .fontId = FONT_ID_BODY_16,
                                     .fontSize = 20,
-                                    .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),  
-                                });  
+                                    .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),
+                                });
                             }
                         }
                     }
@@ -354,12 +353,12 @@ int main(void) {
                     CLAY_TEXT(selected_doc.title, {
                         .fontId = FONT_ID_BODY_16,
                         .fontSize = 24,
-                        .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),              
+                        .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),
                     });
                     CLAY_TEXT(selected_doc.contents, {
                         .fontId = FONT_ID_BODY_16,
                         .fontSize = 18,
-                        .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),              
+                        .textColor = RAYLIB_COLOR_TO_CLAY_COLOR(WHITE),
                         .wrapMode = CLAY_TEXT_WRAP_WORDS,
                     });
                 }
