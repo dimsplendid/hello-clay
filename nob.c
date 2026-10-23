@@ -2,8 +2,10 @@
 #define NOB_IMPLEMENTATION
 #include "nob.h"
 
-#define SRC "src/main.c"
-#define DST "bin/hello-clay.exe"
+// #define SRC "src/main.c"
+// #define DST "bin/hello-clay.exe"
+#define SRC "src/game_ui.c"
+#define DST "bin/game_ui.exe"
 
 Cmd cmd = {0};
 
@@ -17,7 +19,6 @@ void cflags(Cmd *cmd) {
     cmd_append(cmd, "-std=c23");
     cmd_append(cmd, "-Wall");
     cmd_append(cmd, "-Wextra");
-    cmd_append(cmd, "-Werror");
     cmd_append(cmd, "-Werror");
     cmd_append(cmd, "-Wno-missing-field-initializers");
     cmd_append(cmd, "-Wno-sign-compare");
