@@ -1826,6 +1826,12 @@ Clay__MeasureTextCacheItem *Clay__MeasureTextCached(Clay_String *text, Clay_Text
                 lineWidth = 0;
             }
             if (isCJK) {
+                // if there's a word in front of CJK 
+                if (length > 0) {
+                    previousWord = Clay__AddMeasuredWord(CLAY__INIT(Clay__MeasuredWord) { .startOffset = start, .length = length, .width = dimensions.width, .next = -1 }, previousWord);
+                    lineWidth += dimensions.width;
+                }
+
                 Clay_Dimensions cjkDimensions = Clay__MeasureText(CLAY__INIT(Clay_StringSlice) {.length = charLen, .chars = &text->chars[end], .baseChars = text->chars}, config, context->measureTextUserData);
                 measured->minWidth = CLAY__MAX(cjkDimensions.width, measured->minWidth);
                 measuredHeight = CLAY__MAX(measuredHeight, cjkDimensions.height);
