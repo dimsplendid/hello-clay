@@ -2,10 +2,10 @@
 #define NOB_IMPLEMENTATION
 #include "nob.h"
 
-// #define SRC "src/main.c"
-// #define DST "bin/hello-clay.exe"
-#define SRC "src/game_ui.c"
-#define DST "bin/game_ui.exe"
+#define SRC "src/main.c"
+#define DST "bin/hello-clay.exe"
+// #define SRC "src/game_ui.c"
+// #define DST "bin/game_ui.exe"
 
 Cmd cmd = {0};
 

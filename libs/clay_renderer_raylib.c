@@ -179,7 +179,7 @@ static inline Clay_Dimensions Raylib_MeasureText(Clay_StringSlice text, Clay_Tex
     return textSize;
 }
 
-
+static String_Builder raylib_measure_text_sb = {0};
 static inline Clay_Dimensions Raylib_MeasureTextUnicode(
     Clay_StringSlice text,
     Clay_TextElementConfig *config,
@@ -194,13 +194,12 @@ static inline Clay_Dimensions Raylib_MeasureTextUnicode(
     
     if (!font.glyphs) font = GetFontDefault(); // load font file fail, rollback to use default font
 
-    String_Builder sb = {0};
-    sb_append_buf(&sb, text.chars, text.length);
-    sb_append_null(&sb);
+    sb_append_buf(&raylib_measure_text_sb, text.chars, text.length);
+    sb_append_null(&raylib_measure_text_sb);
     
-    Vector2 font_measurement = MeasureTextEx(font, sb.items, font_size, font_spacing);
+    Vector2 font_measurement = MeasureTextEx(font, raylib_measure_text_sb.items, font_size, font_spacing);
 
-    da_free(sb);
+    raylib_measure_text_sb.count -= (text.length + 1); // after measuring, release the memory
 
     return (Clay_Dimensions){font_measurement.x, font_measurement.y};
 }

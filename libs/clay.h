@@ -665,7 +665,9 @@ typedef struct Clay_TextRenderData {
 // add unicode support for CJK
 typedef enum {
     CLAY_UNICODE_ASCII,
+    CLAY_UNICODE_DIACRITICAL_MARK,
     CLAY_UNICODE_GENERAL_PUNCTUATION,
+    CLAY_UNICODE_COMBINING_DIACRITICAL_MARK,
     CLAY_UNICODE_ARROWS,
     CLAY_UNICODE_CJK,
     CLAY_UNICODE_HALFWIDTH_AND_FULL_WIDTH_FORMS,
@@ -678,7 +680,9 @@ typedef struct {
 
 const Clay_UnicodeRange CLAY_UNICODE_BLOCKS[] = {
     [CLAY_UNICODE_ASCII                         ] = {0x0000, 0x0080},
+    [CLAY_UNICODE_DIACRITICAL_MARK              ] = {0x0300, 0x0370},
     [CLAY_UNICODE_GENERAL_PUNCTUATION           ] = {0x2000, 0x2070},
+    [CLAY_UNICODE_COMBINING_DIACRITICAL_MARK    ] = {0x20D0, 0x2100},
     [CLAY_UNICODE_ARROWS                        ] = {0x2190, 0x2200},
     [CLAY_UNICODE_CJK                           ] = {0x3000, 0xA000},
     [CLAY_UNICODE_HALFWIDTH_AND_FULL_WIDTH_FORMS] = {0xFF00, 0xFFF0},

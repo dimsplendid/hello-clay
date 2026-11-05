@@ -34,7 +34,7 @@ void game_frame(float w, float h, float t) {
     size_t rect_count = 100;
     float rw = Clamp(w / rect_count - 2, 4, w);
     float rh = rw;
-    
+
     for (size_t i = 0; i < rect_count; ++i) {
         DrawRectangle(
             w * i / rect_count,
