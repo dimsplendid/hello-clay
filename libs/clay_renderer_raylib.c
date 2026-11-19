@@ -10,6 +10,7 @@
 
 #include "clay.h"
 #include "../nob.h"
+#include "dict.c"
 
 #define CLAY_COLOR_TO_RAYLIB_COLOR(color) (Color) { .r = (unsigned char)roundf(color.r), .g = (unsigned char)roundf(color.g), .b = (unsigned char)roundf(color.b), .a = (unsigned char)roundf(color.a) }
 #define RAYLIB_COLOR_TO_CLAY_COLOR(color) (Clay_Color) {.r = (float)color.r, .g = (float)color.g, .b = (float)color.b, .a = (float)color.a}
@@ -179,14 +180,15 @@ static inline Clay_Dimensions Raylib_MeasureText(Clay_StringSlice text, Clay_Tex
     return textSize;
 }
 
-static String_Builder raylib_measure_text_sb = {0};
+Dict unicode_cache = {0};
 static inline Clay_Dimensions Raylib_MeasureTextUnicode(
     Clay_StringSlice text,
     Clay_TextElementConfig *config,
     void *user_data
 ) {
-    if (text.length == 0 || text.chars == NULL) return (Clay_Dimensions) {0};
-    
+    Clay_Dimensions text_size = {0};
+    if (text.length == 0 || text.chars == NULL) return text_size;
+
     Font *fonts = (Font*)user_data;
     Font font = fonts[config->fontId];
     float font_size = config->fontSize;
@@ -194,14 +196,45 @@ static inline Clay_Dimensions Raylib_MeasureTextUnicode(
     
     if (!font.glyphs) font = GetFontDefault(); // load font file fail, rollback to use default font
 
-    sb_append_buf(&raylib_measure_text_sb, text.chars, text.length);
-    sb_append_null(&raylib_measure_text_sb);
+    float scale_factor = font_size / (float)font.baseSize;
+
+    float max_text_width = 0.0f;
+    float line_text_width = 0.0f;
+    int max_line_char_count = 0;
+    int line_char_count = 0;
     
-    Vector2 font_measurement = MeasureTextEx(font, raylib_measure_text_sb.items, font_size, font_spacing);
+    for (int i = 0; i < text.length; line_char_count++) {
+        int codepoint_size = 0; 
+        int letter = GetCodepointNext(&text.chars[i], &codepoint_size);
+        i += codepoint_size;
+        if (letter == '\n') {
+            max_text_width = fmax(max_text_width, line_text_width);
+            max_line_char_count = CLAY__MAX(max_line_char_count, line_char_count);
+            line_text_width = 0;
+            line_char_count = 0;
+            continue;
+        }
+        Option_Int index = dict_get(unicode_cache, letter);
+        if (index.option == NONE) {
+            index.val = GetGlyphIndex(font, letter);
+            index.option = SOME;
+            dict_set(&unicode_cache, letter, index.val);
+            // printf("cache font: %zu/%zu\n", unicode_cache.count, unicode_cache.capacity);
+        }
+        if (font.glyphs[index.val].advanceX != 0) {
+            line_text_width += font.glyphs[index.val].advanceX;
+        } else {
+            line_text_width += font.recs[index.val].width + font.glyphs[index.val].offsetX;
+        }
+    }
 
-    raylib_measure_text_sb.count -= (text.length + 1); // after measuring, release the memory
+    max_text_width = fmax(max_text_width, line_text_width);
+    max_line_char_count = CLAY__MAX(max_line_char_count, line_char_count);
 
-    return (Clay_Dimensions){font_measurement.x, font_measurement.y};
+    text_size.width = max_text_width * scale_factor + (line_char_count * font_spacing);
+    text_size.height = font_size;
+
+    return text_size;
 }
 
 void Clay_Raylib_Initialize(int width, int height, const char *title, unsigned int flags) {
