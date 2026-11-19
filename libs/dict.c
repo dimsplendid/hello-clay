@@ -5,6 +5,8 @@
 // int dict_hash(char *type, void *key);
 // TODO: simillar API like tsoding's dynamic array
 
+#define LOAD_FACTOR 0.65
+
 typedef struct {
     // int hash;
     int key;
@@ -30,9 +32,10 @@ typedef struct {
 
 Option_Int dict_addr(Dict dict, int key) {
     int i = key % dict.capacity;
-    srand(0);
+    // srand(0);
     for (int j = 0; j < dict.capacity; ++j) {
-        i = (5 * i + 1 + rand()) % dict.capacity;
+        // i = (5 * i + 1 + rand()) % dict.capacity; // pseudo random probe, need modification
+        i = (i + 1) % dict.capacity; // linear probe
         int addr = dict.addr[i];
         if (addr == -1)                  return (Option_Int){ NONE, i };
         if (dict.items[addr].key == key) return (Option_Int){ SOME, i };
@@ -41,7 +44,8 @@ Option_Int dict_addr(Dict dict, int key) {
 }
 
 void dict_alloc(Dict *dict, size_t capacity) {
-    dict->addr = realloc(dict->addr, capacity * sizeof(int));
+    free(dict->addr);
+    dict->addr = malloc(capacity * sizeof(int));
     assert(dict->addr != NULL && "Dict alloc fail: Buy more ram");
     dict->items = realloc(dict->items, capacity * sizeof(Dict_Item));
     assert(dict->items != NULL && "Dict alloc fail: Buy more ram");
@@ -92,7 +96,7 @@ void dict_set(Dict *dict, int key, int val) {
     }
  
     // resize
-    if ((float)dict->count / (float)dict->capacity > 0.8) dict_alloc(dict, dict->capacity * 2);
+    if ((float)dict->count / (float)dict->capacity > LOAD_FACTOR) dict_alloc(dict, dict->capacity * 2);
 }
 
 // TODO
@@ -122,17 +126,18 @@ int fib(int n) {
     return fib(n-1) + fib(n-2);
 }
 
-int fib_cache(int n, Dict *cache) {
-    Option_Int result = dict_get(*cache, n);
+Dict __fib_cache = {0};
+int fib_cache(int n) {
+    Option_Int result = dict_get(__fib_cache, n);
     switch (result.option) {
         case SOME: return result.val; break;
         case NONE:
             if (n<=2) {
-                dict_set(cache, n, 1);
+                dict_set(&__fib_cache, n, 1);
                 return 1;
             } else {
-                dict_set(cache, n, fib_cache(n-1, cache) + fib_cache(n-2, cache));
-                return dict_get(*cache, n).val;
+                dict_set(&__fib_cache, n, fib_cache(n-1) + fib_cache(n-2));
+                return dict_get(__fib_cache, n).val;
             }
             break;
     }
@@ -174,9 +179,8 @@ int main(void) {
         } end_clock();
 
         begin_clock("Fib with cache"); {
-            Dict cache = {0};
-            printf("fib_cache(45) = %d\n", fib_cache(45, &cache));
-            // dict_print(cache);
+            printf("fib_cache(45) = %d\n", fib_cache(45));
+            dict_print(__fib_cache);
         } end_clock();
     } end_clock();
 

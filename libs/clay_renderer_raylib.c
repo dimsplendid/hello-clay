@@ -180,6 +180,7 @@ static inline Clay_Dimensions Raylib_MeasureText(Clay_StringSlice text, Clay_Tex
     return textSize;
 }
 
+// TODO: separate different font for caches, now only support 1 font
 Dict unicode_cache = {0};
 static inline Clay_Dimensions Raylib_MeasureTextUnicode(
     Clay_StringSlice text,
@@ -203,7 +204,7 @@ static inline Clay_Dimensions Raylib_MeasureTextUnicode(
     int max_line_char_count = 0;
     int line_char_count = 0;
     
-    for (int i = 0; i < text.length; line_char_count++) {
+    for (int i = 0; i < text.length;) {
         int codepoint_size = 0; 
         int letter = GetCodepointNext(&text.chars[i], &codepoint_size);
         i += codepoint_size;
@@ -214,12 +215,14 @@ static inline Clay_Dimensions Raylib_MeasureTextUnicode(
             line_char_count = 0;
             continue;
         }
+        line_char_count++;
         Option_Int index = dict_get(unicode_cache, letter);
         if (index.option == NONE) {
             index.val = GetGlyphIndex(font, letter);
             index.option = SOME;
             dict_set(&unicode_cache, letter, index.val);
             // printf("cache font: %zu/%zu\n", unicode_cache.count, unicode_cache.capacity);
+            // printf("cache font: %d: %d\n", letter, index.val);
         }
         if (font.glyphs[index.val].advanceX != 0) {
             line_text_width += font.glyphs[index.val].advanceX;
