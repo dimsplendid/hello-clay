@@ -31,11 +31,15 @@ typedef struct {
 } Option_Int;
 
 Option_Int dict_addr(Dict dict, int key) {
-    int i = key % dict.capacity;
+    
     // srand(0);
-    for (int j = 0; j < dict.capacity; ++j) {
+    for (
+        int j = 0, i = (key % dict.capacity);
+        j < dict.capacity;
+        ++j,
         // i = (5 * i + 1 + rand()) % dict.capacity; // pseudo random probe, need modification
-        i = (i + 1) % dict.capacity; // linear probe
+        i = (i + 1) % dict.capacity // linear probe
+    ) {
         int addr = dict.addr[i];
         if (addr == -1)                  return (Option_Int){ NONE, i };
         if (dict.items[addr].key == key) return (Option_Int){ SOME, i };
@@ -115,8 +119,8 @@ void dict_print(Dict dict) {
     printf("[count: %zu, capacity: %zu]\n", dict.count, dict.capacity);
     printf("{\n");
     for (size_t i = 0; i < dict.count; ++i) {
-        // printf("addr = %d\t    %d: %d\n", dict_addr(dict, dict.items[i].key).val, dict.items[i].key, dict.items[i].val);
-        printf("    %d: %d\n", dict.items[i].key, dict.items[i].val);
+        printf("addr = %d\t    %d: %d\n", dict_addr(dict, dict.items[i].key).val, dict.items[i].key, dict.items[i].val);
+        // printf("    %d: %d\n", dict.items[i].key, dict.items[i].val);
     }
     printf("}\n");
 }
