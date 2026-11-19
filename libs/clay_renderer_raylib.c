@@ -9,7 +9,6 @@
 #include <stdlib.h>
 
 #include "clay.h"
-#include "../nob.h"
 #include "dict.c"
 
 #define CLAY_COLOR_TO_RAYLIB_COLOR(color) (Color) { .r = (unsigned char)roundf(color.r), .g = (unsigned char)roundf(color.g), .b = (unsigned char)roundf(color.b), .a = (unsigned char)roundf(color.a) }
