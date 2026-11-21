@@ -56,28 +56,31 @@ Clay_String clay_str_from_sv(String_View sv) {
     };
 }
 
-String_Builder __tmp_str_arena = {0};
-Clay_String clay_tmp_fstr(const char *fmt, ...) {
+String_Builder __frame_str_arena = {0};
+Clay_String clay_frame_fstr(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
+
     int n = vsnprintf(NULL, 0, fmt, args);
+
     va_end(args);
-    da_reserve(&__tmp_str_arena, __tmp_str_arena.count+n+1);
-    char *dest = __tmp_str_arena.items + __tmp_str_arena.count;
+    da_reserve(&__frame_str_arena, __frame_str_arena.count+n+1);
+
+    char *dest = __frame_str_arena.items + __frame_str_arena.count;
+    __frame_str_arena.count += n;
+
     va_start(args, fmt);
     vsnprintf(dest, n+1, fmt, args);
     va_end(args);
 
-    __tmp_str_arena.count += n;
-
     return (Clay_String) {
         .length = n,
-        .chars  = __tmp_str_arena.items + __tmp_str_arena.count - n,
+        .chars  = dest,
     };
 }
 
-void clay_tmp_str_rewind() {
-    __tmp_str_arena.count = 0;
+void clay_frame_str_rewind() {
+    __frame_str_arena.count = 0;
 }
 
 int main(void) {
@@ -105,7 +108,7 @@ int main(void) {
     
     // Render
     while (!WindowShouldClose()) {
-        clay_tmp_str_rewind();
+        clay_frame_str_rewind();
         float dt = GetFrameTime();
         Clay_SetLayoutDimensions((Clay_Dimensions) {GetScreenWidth(), GetScreenHeight()});
 
@@ -146,7 +149,7 @@ int main(void) {
                     { .fontSize = 48, .textColor = DEFAULT_TEXT_COLOR }
                 );
                 CLAY_TEXT(
-                    clay_tmp_fstr("滾滾長江東逝水"),
+                    clay_frame_fstr("滾滾長江東逝水"),
                     { .fontSize = 48, .textColor = DEFAULT_TEXT_COLOR }
                 );
             }
@@ -163,13 +166,13 @@ int main(void) {
                 }
             ) {
                 CLAY_TEXT(
-                    clay_tmp_fstr("Test Side Bar: %d", 0),
+                    clay_frame_fstr("Test Side Bar: %d", 0),
                     { .fontSize = 32, .textColor = DEFAULT_TEXT_COLOR }
                 );
                 CLAY_AUTO_ID({ .layout = { .sizing = { .height = CLAY_SIZING_GROW(0) } } });
                 Clay_PointerData pointer = Clay_GetPointerState();
                 CLAY_TEXT(
-                    clay_tmp_fstr("(x: %.2f, y: %.2f)", pointer.position.x, pointer.position.y),
+                    clay_frame_fstr("(x: %.2f, y: %.2f)", pointer.position.x, pointer.position.y),
                     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                 );
             }
