@@ -1,7 +1,9 @@
 #include <raylib.h>
 #include <raymath.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define CLAY_IMPLEMENTATION
@@ -47,6 +49,36 @@ Clay_String clay_str_from_sb(String_Builder sb) {
         .chars = sb.items,
     };
 }
+Clay_String clay_str_from_sv(String_View sv) {
+    return (Clay_String) {
+        .length = sv.count,
+        .chars = sv.items,
+    };
+}
+
+String_Builder __tmp_str_arena = {0};
+Clay_String clay_tmp_fstr(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int n = vsnprintf(NULL, 0, fmt, args);
+    va_end(args);
+    da_reserve(&__tmp_str_arena, __tmp_str_arena.count+n+1);
+    char *dest = __tmp_str_arena.items + __tmp_str_arena.count;
+    va_start(args, fmt);
+    vsnprintf(dest, n+1, fmt, args);
+    va_end(args);
+
+    __tmp_str_arena.count += n;
+
+    return (Clay_String) {
+        .length = n,
+        .chars  = __tmp_str_arena.items + __tmp_str_arena.count - n,
+    };
+}
+
+void clay_tmp_str_rewind() {
+    __tmp_str_arena.count = 0;
+}
 
 int main(void) {
     // initailize
@@ -70,9 +102,10 @@ int main(void) {
     );    
     Clay_SetMeasureTextFunction(Raylib_MeasureTextUnicode, fonts);
     SetTargetFPS(60);
-    String_Builder temp_str = {0};
+    
     // Render
     while (!WindowShouldClose()) {
+        clay_tmp_str_rewind();
         float dt = GetFrameTime();
         Clay_SetLayoutDimensions((Clay_Dimensions) {GetScreenWidth(), GetScreenHeight()});
 
@@ -112,10 +145,8 @@ int main(void) {
                     CLAY_STRING("Hello Civilization!"),
                     { .fontSize = 48, .textColor = DEFAULT_TEXT_COLOR }
                 );
-                temp_str.count = 0;
-                sb_appendf(&temp_str, "滾滾長江東逝水");
                 CLAY_TEXT(
-                    clay_str_from_sb(temp_str),
+                    clay_tmp_fstr("滾滾長江東逝水"),
                     { .fontSize = 48, .textColor = DEFAULT_TEXT_COLOR }
                 );
             }
@@ -131,18 +162,14 @@ int main(void) {
                     .cornerRadius = CLAY_CORNER_RADIUS(16),
                 }
             ) {
-                temp_str.count = 0;
-                sb_appendf(&temp_str, "Test Side Bar: %d", 0);
                 CLAY_TEXT(
-                    clay_str_from_sb(temp_str),
+                    clay_tmp_fstr("Test Side Bar: %d", 0),
                     { .fontSize = 32, .textColor = DEFAULT_TEXT_COLOR }
                 );
                 CLAY_AUTO_ID({ .layout = { .sizing = { .height = CLAY_SIZING_GROW(0) } } });
                 Clay_PointerData pointer = Clay_GetPointerState();
-                temp_str.count = 0;
-                sb_appendf(&temp_str, "(x: %.2f, y: %.2f)", pointer.position.x, pointer.position.y);
                 CLAY_TEXT(
-                    clay_str_from_sb(temp_str),
+                    clay_tmp_fstr("(x: %.2f, y: %.2f)", pointer.position.x, pointer.position.y),
                     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                 );
             }
