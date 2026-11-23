@@ -674,8 +674,8 @@ typedef enum {
 } Clay_UnicodeBlock;
 
 typedef struct {
-    int begin;
-    int end;
+    uint32_t begin;
+    uint32_t end;
 } Clay_UnicodeRange;
 
 const Clay_UnicodeRange CLAY_UNICODE_BLOCKS[] = {
