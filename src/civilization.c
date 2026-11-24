@@ -18,11 +18,11 @@
 constexpr Clay_Color DEFAULT_TEXT_COLOR = { 255, 255, 255, 255 };
 constexpr uint32_t FONT_ID_DEFAULT = 0;
 
-#define RESOURCE_LIST                                                       \
-    X(LAND  , .count = 1.5e14, .unit = 1 , .color = BROWN)                  \
-    X(TREE  , .count = 3e12  , .unit = 15, .color = GREEN, .rate = 1.45)    \
-    X(WORKER, .count = 6e9   , .unit = 50, .color = BLUE , .rate = 1.0025)  \
-    X(BOILER,                              .color = GRAY)
+#define RESOURCE_LIST                                                                                                   \
+    X(LAND  , .count = 1.5e14, .unit = 1  , .color = ORANGE)                                                            \
+    X(TREE  , .count = 3e12  , .unit = 15 , .color = GREEN, .grow_rate = 1.45, .energy = 9.25e9, .consume_rate = 1e-1)  \
+    X(WORKER, .count = 0e8   , .unit = 1e6, .color = BLUE , .grow_rate = 1.0025)                                        \
+    X(BOILER,                               .color = GRAY)
 
 typedef enum {
 #define X(name, ...) name,
@@ -34,7 +34,9 @@ typedef enum {
 typedef struct {
     double count;
     double unit;
-    double rate;
+    double grow_rate;
+    double energy;
+    double consume_rate;
     Color color;
     String_View name;
 } Resource;
@@ -42,7 +44,9 @@ typedef struct {
 #define STRING(string) (String_Builder)
 
 struct {
-    uint32_t time; // unit: frame
+    int fps;
+    uint32_t time; // unit: frame (1/60 s)
+    float time_unit; // game sec per real sec
     double power;
     Resource resource[RESOURCE_COUNT];
     String_Builder frame_str_arena;
@@ -53,6 +57,8 @@ struct {
         RESOURCE_LIST
 #undef X
     },
+    .fps = 60,
+    .time_unit = 3600, // 1 sec = 1 game hour
 };
 
 Font load_font(char *file_name) {
@@ -138,17 +144,25 @@ void upgrade(
 }
 
 void update_resource() {
+    double empty_land = game_ctx.resource[LAND].count;
+    for(size_t i = 1; i < RESOURCE_COUNT; ++i) {
+        Resource r = game_ctx.resource[i];
+        empty_land -= r.count * r.unit;
+    }
     for(size_t res = 0; res < RESOURCE_COUNT; ++res) {
         switch (res) {
             case WORKER: {
-                double x = game_ctx.resource[WORKER].count * game_ctx.resource[WORKER].unit / game_ctx.resource[LAND].count;
-                game_ctx.resource[WORKER].count = game_ctx.resource[LAND].count * game_ctx.resource[WORKER].rate * x * (1-x) / game_ctx.resource[WORKER].unit;
+                double p = game_ctx.resource[WORKER].count * game_ctx.resource[WORKER].unit;
+                double total = p + empty_land;
+                double x = p / total;
+                game_ctx.resource[WORKER].count = game_ctx.resource[WORKER].grow_rate * x * (1-x) * total / game_ctx.resource[WORKER].unit;
             } break;
             case TREE: {
-                double x = game_ctx.resource[TREE].count * game_ctx.resource[TREE].unit / game_ctx.resource[LAND].count;
-                game_ctx.resource[TREE].count = game_ctx.resource[LAND].count * game_ctx.resource[TREE].rate * x * (1-x) / game_ctx.resource[TREE].unit - game_ctx.resource[WORKER].count;
-                // burn 1 tree per hour?
-                game_ctx.power = 9.25e9 * game_ctx.resource[WORKER].count / 3600;
+                double p = game_ctx.resource[TREE].count * game_ctx.resource[TREE].unit;
+                double total = p + empty_land;
+                double x = p / total;
+                game_ctx.resource[TREE].count = game_ctx.resource[TREE].grow_rate * x * (1-x) * total / game_ctx.resource[TREE].unit - game_ctx.resource[WORKER].count * game_ctx.resource[TREE].consume_rate;
+                game_ctx.power = game_ctx.resource[TREE].energy * game_ctx.resource[WORKER].count * game_ctx.resource[TREE].consume_rate / game_ctx.time_unit;
             } break;
             default:
         }
@@ -223,8 +237,10 @@ int main(void) {
         (Clay_ErrorHandler){ handle_clay_errors }
     );    
     Clay_SetMeasureTextFunction(Raylib_MeasureTextUnicode, fonts);
-    SetTargetFPS(60);
+    SetTargetFPS(game_ctx.fps);
     
+    int key_pressed = '?';
+    bool open_tech_panel = false;
     // Render
     while (!WindowShouldClose()) {
         game_frame_str_rewind();
@@ -262,6 +278,10 @@ int main(void) {
                     .cornerRadius = CLAY_CORNER_RADIUS(16),
                 }
             ) {
+                CLAY_TEXT(
+                    game_frame_fstr("人類歷 %.2f 年", game_ctx.time / (double)game_ctx.fps * game_ctx.time_unit / 31557600),
+                    { .fontSize = 48, .textColor = DEFAULT_TEXT_COLOR }, 
+                );
                 double kardashev_scale = log10(game_ctx.power)/10 - 0.6;
                 CLAY_TEXT(
                     game_frame_fstr("文明等級 = %.2f 級", kardashev_scale > 0 ? kardashev_scale : 0),
@@ -303,7 +323,7 @@ int main(void) {
                         { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                     );
                     CLAY_TEXT(
-                        game_frame_fstr("成長率：%.3f/s", game_ctx.resource[WORKER].rate),
+                        game_frame_fstr("成長率：%.3f/s", game_ctx.resource[WORKER].grow_rate),
                         { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                     );
                 }
@@ -325,16 +345,41 @@ int main(void) {
                         { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                     );
                     CLAY_TEXT(
-                        game_frame_fstr("成長率：%.3f/s", game_ctx.resource[TREE].rate),
+                        game_frame_fstr("成長率：%.3f/s", game_ctx.resource[TREE].grow_rate),
                         { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                     );
                 }
                 CLAY_AUTO_ID({ .layout = { .sizing = { .height = CLAY_SIZING_GROW(0) } } });
                 Clay_PointerData pointer = Clay_GetPointerState();
+                key_pressed = GetKeyPressed() ? GetCharPressed() : key_pressed;
                 CLAY_TEXT(
-                    game_frame_fstr("(x: %.0f, y: %.0f)", pointer.position.x, pointer.position.y),
+                    game_frame_fstr("(x: %.0f, y: %.0f), (%c)", pointer.position.x, pointer.position.y, key_pressed),
                     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                 );
+                CLAY_TEXT(
+                    game_frame_fstr("open_tech_panel = %s", open_tech_panel ? "true" : "false"),
+                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
+                );
+            }
+            if (IsKeyPressed(KEY_T)) open_tech_panel = !open_tech_panel;
+            if (open_tech_panel) {
+                CLAY(
+                    CLAY_ID("technology"),
+                    {
+                        .floating = {
+                            .attachTo = CLAY_ATTACH_TO_PARENT,
+                            // .attachPoints = { .parent = CLAY_ATTACH_POINT_CENTER_CENTER },
+                            .attachPoints = { .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+                        },
+                        .backgroundColor = { 50, 70, 50, 255 },
+                        .layout = {
+                            .sizing = layout_expand,
+                        },
+                        .cornerRadius = CLAY_CORNER_RADIUS(8),
+                    }
+                ){
+            
+                }
             }
         }
         Clay_RenderCommandArray ui = Clay_EndLayout(dt);
@@ -344,7 +389,7 @@ int main(void) {
         game_render();
         Clay_Raylib_Render(ui, fonts);
         EndDrawing();
-        if (game_ctx.time % 60 == 30) update_resource();
+        if (game_ctx.time % 60 == 0) update_resource(); // update resource per sec.
         game_ctx.time++;
     }
 }
