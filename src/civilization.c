@@ -50,6 +50,10 @@ struct {
     double power;
     Resource resource[RESOURCE_COUNT];
     String_Builder frame_str_arena;
+    struct {
+        char *items[100];
+        size_t count;
+    } old_arena;
     Clay_BoundingBox bounding_box;
 } game_ctx = {
     .resource = {
@@ -109,7 +113,21 @@ Clay_String game_frame_fstr(const char *fmt, ...) {
     int n = vsnprintf(NULL, 0, fmt, args);
 
     va_end(args);
-    da_reserve(&game_ctx.frame_str_arena, game_ctx.frame_str_arena.count+n+1);
+
+    size_t expected_capacity = game_ctx.frame_str_arena.count + n + 1;
+    if (expected_capacity > game_ctx.frame_str_arena.capacity) {
+        if (game_ctx.frame_str_arena.capacity == 0) {
+            game_ctx.frame_str_arena.capacity = 256;
+        } else {
+            game_ctx.old_arena.items[game_ctx.old_arena.count++] = game_ctx.frame_str_arena.items;
+        }
+        while (expected_capacity > game_ctx.frame_str_arena.capacity) {
+            game_ctx.frame_str_arena.capacity *= 2;
+        }
+        game_ctx.frame_str_arena.items = malloc(sizeof(char) * game_ctx.frame_str_arena.capacity);
+        assert(game_ctx.frame_str_arena.items && "frame str arena alloc fail, buy more RAM");
+        // printf("arena capacity: %zu\n", game_ctx.frame_str_arena.capacity);
+    }
 
     // alloc buffer
     char *dest = game_ctx.frame_str_arena.items + game_ctx.frame_str_arena.count;
@@ -128,6 +146,11 @@ Clay_String game_frame_fstr(const char *fmt, ...) {
 
 void game_frame_str_rewind() {
     game_ctx.frame_str_arena.count = 0;
+    // free previous arena
+    for (size_t i = 0; i < game_ctx.old_arena.count; ++i) {
+        free(game_ctx.old_arena.items[i]);
+    }
+    game_ctx.old_arena.count = 0;
 }
 
 void upgrade(
@@ -353,8 +376,23 @@ int main(void) {
                 Clay_PointerData pointer = Clay_GetPointerState();
                 key_pressed = GetKeyPressed() ? GetCharPressed() : key_pressed;
                 CLAY_TEXT(
-                    game_frame_fstr("(x: %.0f, y: %.0f), (%c)", pointer.position.x, pointer.position.y, key_pressed),
+                    game_frame_fstr("(x: %.0f, y: %.0f)", pointer.position.x, pointer.position.y),
                     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
+                );
+                CLAY_TEXT(
+                    game_frame_fstr("last pressed key: %c", key_pressed),
+                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
+                );
+                Clay_ElementIdArray elements = Clay_GetPointerOverIds();
+                Clay_String element_name = elements.internalArray[elements.length-1].stringId;
+                uint32_t element_id = elements.internalArray[elements.length-1].id;
+                CLAY_TEXT(
+                    game_frame_fstr("Hovered Element:"),
+                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
+                );
+                CLAY_TEXT(
+                    game_frame_fstr("%u, %.*s", element_id, element_name.length, element_name.chars),
+                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
                 );
                 CLAY_TEXT(
                     game_frame_fstr("open_tech_panel = %s", open_tech_panel ? "true" : "false"),
@@ -371,13 +409,40 @@ int main(void) {
                             // .attachPoints = { .parent = CLAY_ATTACH_POINT_CENTER_CENTER },
                             .attachPoints = { .parent = CLAY_ATTACH_POINT_LEFT_TOP },
                         },
-                        .backgroundColor = { 50, 70, 50, 255 },
+                        .backgroundColor = { 50, 80, 50, 200 },
                         .layout = {
                             .sizing = layout_expand,
+                            .padding = CLAY_PADDING_ALL(20),
+                            .childGap = 8,
                         },
-                        .cornerRadius = CLAY_CORNER_RADIUS(8),
                     }
                 ){
+                    for (uint32_t i = 0; i < 20; ++i) {
+                        CLAY(
+                            CLAY_SID(game_frame_fstr("col-%u", i)),
+                            {
+                                .layout = {
+                                    .sizing = layout_expand,
+                                    .childGap = 8,
+                                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                                }
+                            }
+                        ) {
+                            for (uint32_t j = 0; j < 20; ++j) {
+                                CLAY(
+                                    CLAY_SID(game_frame_fstr("(%u,%u)", i, j)),
+                                    {
+                                        .layout = {
+                                            .sizing = layout_expand
+                                        },
+                                        .backgroundColor = { 50, 50, 80, 100 },
+                                        .border = { { .a = 255 }, CLAY_BORDER_ALL(1) },
+                                    }
+                                );
+                            
+                            }
+                        }
+                    }
             
                 }
             }
