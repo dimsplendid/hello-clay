@@ -43,18 +43,22 @@ typedef struct {
 
 #define STRING(string) (String_Builder)
 
+typedef struct {
+    char *items[32];
+    size_t count;
+} Fixed_Str_Array;
+
 struct {
     int fps;
     uint32_t time; // unit: frame (1/60 s)
     float time_unit; // game sec per real sec
     double power;
     Resource resource[RESOURCE_COUNT];
-    String_Builder frame_str_arena;
-    struct {
-        char *items[100];
-        size_t count;
-    } old_arena;
     Clay_BoundingBox bounding_box;
+    String_Builder frame_str_arena;
+    // old arena would live one more frame
+    Fixed_Str_Array preserved_arena;
+    Fixed_Str_Array tofree_arena;
 } game_ctx = {
     .resource = {
 #define X(res_name, ...) [res_name] = { .name = SVLIT(#res_name), __VA_ARGS__ },
@@ -120,7 +124,7 @@ Clay_String game_frame_str(const char *fmt, ...) {
             game_ctx.frame_str_arena.capacity = 256;
         } else {
             // preserve origin memory until rewind
-            game_ctx.old_arena.items[game_ctx.old_arena.count++] = game_ctx.frame_str_arena.items;
+            game_ctx.preserved_arena.items[game_ctx.preserved_arena.count++] = game_ctx.frame_str_arena.items;
         }
         while (expected_capacity > game_ctx.frame_str_arena.capacity) {
             game_ctx.frame_str_arena.capacity *= 2;
@@ -147,11 +151,15 @@ Clay_String game_frame_str(const char *fmt, ...) {
 
 void game_frame_str_rewind() {
     game_ctx.frame_str_arena.count = 0;
-    // free previous arena
-    for (size_t i = 0; i < game_ctx.old_arena.count; ++i) {
-        free(game_ctx.old_arena.items[i]);
+    // previous arena would preserve 1 frame, then free
+    for (size_t i = 0; i < game_ctx.tofree_arena.count; ++i) {
+        free(game_ctx.tofree_arena.items[i]);
     }
-    game_ctx.old_arena.count = 0;
+    for (size_t i = 0; i < game_ctx.preserved_arena.count; ++i) {
+        game_ctx.tofree_arena.items[i] = game_ctx.preserved_arena.items[i];
+    }
+    game_ctx.tofree_arena.count = game_ctx.preserved_arena.count;
+    game_ctx.preserved_arena.count = 0;
 }
 
 void upgrade(
@@ -385,17 +393,17 @@ int main(void) {
                     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                 );
                 // BUG: the arena still failed when using mouse detect stringId
-                // CLAY_TEXT(
-                //     game_frame_str("Hovered Element:"),
-                //     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
-                // );
-                // Clay_ElementIdArray elements = Clay_GetPointerOverIds();
-                // Clay_String element_name = elements.internalArray[elements.length-1].stringId;
-                // uint32_t element_id = elements.internalArray[elements.length-1].id;
-                // CLAY_TEXT(
-                //     game_frame_str("%u, %.*s", element_id, element_name.length, element_name.chars),
-                //     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
-                // );
+                CLAY_TEXT(
+                    game_frame_str("Hovered Element:"),
+                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
+                );
+                Clay_ElementIdArray elements = Clay_GetPointerOverIds();
+                Clay_String element_name = elements.internalArray[elements.length-1].stringId;
+                uint32_t element_id = elements.internalArray[elements.length-1].id;
+                CLAY_TEXT(
+                    game_frame_str("%u, %.*s", element_id, element_name.length, element_name.chars),
+                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
+                );
                 CLAY_TEXT(
                     game_frame_str("open_tech_panel = %s", open_tech_panel ? "true" : "false"),
                     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
