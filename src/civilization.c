@@ -106,7 +106,7 @@ Clay_String clay_str_from_sv(String_View sv) {
 }
 
 [[gnu::format(printf, 1, 2)]]
-Clay_String game_frame_fstr(const char *fmt, ...) {
+Clay_String game_frame_str(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
@@ -119,6 +119,7 @@ Clay_String game_frame_fstr(const char *fmt, ...) {
         if (game_ctx.frame_str_arena.capacity == 0) {
             game_ctx.frame_str_arena.capacity = 256;
         } else {
+            // preserve origin memory until rewind
             game_ctx.old_arena.items[game_ctx.old_arena.count++] = game_ctx.frame_str_arena.items;
         }
         while (expected_capacity > game_ctx.frame_str_arena.capacity) {
@@ -302,16 +303,16 @@ int main(void) {
                 }
             ) {
                 CLAY_TEXT(
-                    game_frame_fstr("人類歷 %.2f 年", game_ctx.time / (double)game_ctx.fps * game_ctx.time_unit / 31557600),
+                    game_frame_str("人類歷 %.2f 年", game_ctx.time / (double)game_ctx.fps * game_ctx.time_unit / 31557600),
                     { .fontSize = 48, .textColor = DEFAULT_TEXT_COLOR }, 
                 );
                 double kardashev_scale = log10(game_ctx.power)/10 - 0.6;
                 CLAY_TEXT(
-                    game_frame_fstr("文明等級 = %.2f 級", kardashev_scale > 0 ? kardashev_scale : 0),
+                    game_frame_str("文明等級 = %.2f 級", kardashev_scale > 0 ? kardashev_scale : 0),
                     { .fontSize = 48, .textColor = DEFAULT_TEXT_COLOR }
                 );
                 CLAY_TEXT(
-                    game_frame_fstr("能源消耗 = %.2E W", game_ctx.power),
+                    game_frame_str("能源消耗 = %.2E W", game_ctx.power),
                     { .fontSize = 48, .textColor = DEFAULT_TEXT_COLOR }
                 );
             }
@@ -342,11 +343,11 @@ int main(void) {
                 ) {
                     Clay_OnHover(upgrade, NULL);
                     CLAY_TEXT(
-                        game_frame_fstr("人口：%.0f 人", game_ctx.resource[WORKER].count),
+                        game_frame_str("人口：%.0f 人", game_ctx.resource[WORKER].count),
                         { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                     );
                     CLAY_TEXT(
-                        game_frame_fstr("成長率：%.3f/s", game_ctx.resource[WORKER].grow_rate),
+                        game_frame_str("成長率：%.3f/s", game_ctx.resource[WORKER].grow_rate),
                         { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                     );
                 }
@@ -364,11 +365,11 @@ int main(void) {
                 ) {
                     Clay_OnHover(upgrade, NULL);
                     CLAY_TEXT(
-                        game_frame_fstr("樹：%.0f 棵", game_ctx.resource[TREE].count),
+                        game_frame_str("樹：%.0f 棵", game_ctx.resource[TREE].count),
                         { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                     );
                     CLAY_TEXT(
-                        game_frame_fstr("成長率：%.3f/s", game_ctx.resource[TREE].grow_rate),
+                        game_frame_str("成長率：%.3f/s", game_ctx.resource[TREE].grow_rate),
                         { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                     );
                 }
@@ -376,26 +377,27 @@ int main(void) {
                 Clay_PointerData pointer = Clay_GetPointerState();
                 key_pressed = GetKeyPressed() ? GetCharPressed() : key_pressed;
                 CLAY_TEXT(
-                    game_frame_fstr("(x: %.0f, y: %.0f)", pointer.position.x, pointer.position.y),
+                    game_frame_str("(x: %.0f, y: %.0f)", pointer.position.x, pointer.position.y),
                     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                 );
                 CLAY_TEXT(
-                    game_frame_fstr("last pressed key: %c", key_pressed),
+                    game_frame_str("last pressed key: %c", key_pressed),
                     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                 );
-                Clay_ElementIdArray elements = Clay_GetPointerOverIds();
-                Clay_String element_name = elements.internalArray[elements.length-1].stringId;
-                uint32_t element_id = elements.internalArray[elements.length-1].id;
+                // BUG: the arena still failed when using mouse detect stringId
+                // CLAY_TEXT(
+                //     game_frame_str("Hovered Element:"),
+                //     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
+                // );
+                // Clay_ElementIdArray elements = Clay_GetPointerOverIds();
+                // Clay_String element_name = elements.internalArray[elements.length-1].stringId;
+                // uint32_t element_id = elements.internalArray[elements.length-1].id;
+                // CLAY_TEXT(
+                //     game_frame_str("%u, %.*s", element_id, element_name.length, element_name.chars),
+                //     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
+                // );
                 CLAY_TEXT(
-                    game_frame_fstr("Hovered Element:"),
-                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
-                );
-                CLAY_TEXT(
-                    game_frame_fstr("%u, %.*s", element_id, element_name.length, element_name.chars),
-                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
-                );
-                CLAY_TEXT(
-                    game_frame_fstr("open_tech_panel = %s", open_tech_panel ? "true" : "false"),
+                    game_frame_str("open_tech_panel = %s", open_tech_panel ? "true" : "false"),
                     { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
                 );
             }
@@ -419,7 +421,7 @@ int main(void) {
                 ){
                     for (uint32_t i = 0; i < 20; ++i) {
                         CLAY(
-                            CLAY_SID(game_frame_fstr("col-%u", i)),
+                            CLAY_SID(game_frame_str("col-%u", i)),
                             {
                                 .layout = {
                                     .sizing = layout_expand,
@@ -430,7 +432,7 @@ int main(void) {
                         ) {
                             for (uint32_t j = 0; j < 20; ++j) {
                                 CLAY(
-                                    CLAY_SID(game_frame_fstr("(%u,%u)", i, j)),
+                                    CLAY_SID(game_frame_str("(%u,%u)", i, j)),
                                     {
                                         .layout = {
                                             .sizing = layout_expand
