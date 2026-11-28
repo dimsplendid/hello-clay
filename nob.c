@@ -24,6 +24,7 @@ void cflags(Cmd *cmd) {
     cmd_append(cmd, "-Werror");
     cmd_append(cmd, "-Wno-missing-field-initializers");
     cmd_append(cmd, "-Wno-sign-compare");
+    cmd_append(cmd, "-Wno-initializer-overrides");
     cmd_append(cmd, "-g");
     cmd_append(cmd, "-fsanitize=address");
 #ifdef __APPLE__

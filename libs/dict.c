@@ -1,5 +1,8 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <stdint.h>
+
+#include "../nob.h"
 
 // TODO: hash function
 // int dict_hash(char *type, void *key);
@@ -106,6 +109,102 @@ void dict_set(Dict *dict, int key, int val) {
 // TODO
 // void dict_del(Dict *dict, int key) {}
 
+// Generalized
+// make custom struct:
+// ```C
+// typedef struct {
+//     struct {
+//         Key_Type key, // need hashable, or expand the DICT_ID macro below
+//         Val_Type val,
+//     } *items;
+//     int *addr;
+//     size_t count;
+//     size_t capacity;
+// } Custom_Dict
+// ```
+// Usage:
+// ```C
+// Custom_Dict x = {};
+// DICT_SET(&x, key, val);
+// Option_Val option_val = DICT_GET(x, key);
+// DICT_FREE(&x);
+// ```
+
+#define DICT_ID(X) _Generic((X), \
+    int:    dict_hash_u32,       \
+    String_View: dict_hash_sv    \
+)(X, 0)
+
+int dict_hash_u32(int key, const int seed) {
+    int hash = seed;
+    hash += (key + 48);
+    hash += (hash << 10);
+    hash ^= (hash >> 6);
+
+    hash += (hash << 3);
+    hash ^= (hash >> 11);
+    hash += (hash << 15);
+    return hash;
+}
+
+int dict_hash_sv(String_View key, const int seed) {
+    int hash = seed;
+    for (int i = 0; i < key.count; ++i) {
+        hash += key.items[i];
+        hash += (hash << 10);
+        hash ^= (hash >> 6);
+    }
+
+    hash += (hash << 3);
+    hash ^= (hash >> 11);
+    hash += (hash << 15);
+    return hash;
+}
+
+typedef struct {
+    struct {
+        String_View key;
+        String_View val;
+    } *items;
+    int *addr;
+    size_t count;
+    size_t capacity;
+} Dict_SV_SV;
+
+
+// void dict_reserve(Dict_SV_SV *dict, size_t expected_capacity) {
+    
+// }
+
+
+// #define DICT_SET(dict, key, val) {
+// void dict_set_macro(Dict_SV_SV *dict, String_View key, String_View val) {
+//     // init
+//     size_t expect_capacity = dict->capacity ? dict->count + 1 : 4;
+//     if ((float)(dict->count + 1) / ((float)dict->capacity + 1) > LOAD_FACTOR){
+//         dict->addr = malloc(expect_capacity * 2 * sizeof(int));
+//         assert(dict->addr != NULL && "Dict alloc fail: Buy more ram");
+//         dict->items = realloc(dict->items, expect_capacity * sizeof(*dict->items));
+//         assert(dict->items != NULL && "Dict alloc fail: Buy more ram");
+//     };
+    
+    // Option_Int i_addr = dict_addr(*dict, key);
+
+    // switch (i_addr.option) {
+    //     case SOME: 
+    //         dict->items[dict->addr[i_addr.val]].val = val;
+    //         break;
+    //     case NONE:
+    //         assert(i_addr.val >= 0 && "No Space for Dict");
+    //         dict->addr[i_addr.val] = dict->count; 
+    //         dict->items[dict->count++] = (Dict_Item) { key, val };
+    //         break;
+    // }
+ 
+    // // resize
+    // if ((float)dict->count / (float)dict->capacity > LOAD_FACTOR) dict_alloc(dict, dict->capacity * 2);
+// }
+
 // #define DICT_DEBUG_MAIN
 #ifdef DICT_DEBUG_MAIN
 
@@ -148,7 +247,10 @@ int fib_cache(int n) {
 }
 
 int main(void) {
-
+    printf("Hash(32) = %u\n", DICT_ID(32));
+    printf("Hash(\"hash\") = %u\n", DICT_ID(SVLIT("hash")));
+    printf("Hash(\"化學\") = %u\n", DICT_ID(SVLIT("化學")));
+    
     begin_clock("Dict Random test"); {    
         Dict dict = {0};
         for (int i = 0; i < 19; ++i) {
@@ -179,11 +281,11 @@ int main(void) {
 
     begin_clock("Cache Test"); {
         begin_clock("Fib without cache"); {
-            printf("fib(45) = %d\n", fib(45));
+            printf("fib(40) = %d\n", fib(40));
         } end_clock();
 
         begin_clock("Fib with cache"); {
-            printf("fib_cache(45) = %d\n", fib_cache(45));
+            printf("fib_cache(40) = %d\n", fib_cache(40));
             dict_print(__fib_cache);
         } end_clock();
     } end_clock();

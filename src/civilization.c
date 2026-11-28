@@ -29,7 +29,7 @@ typedef enum {
     RESOURCE_LIST
 #undef X
     RESOURCE_COUNT
-} Resource_Index;
+} Resource_Kind;
 
 typedef struct {
     double count;
@@ -41,12 +41,64 @@ typedef struct {
     String_View name;
 } Resource;
 
-#define STRING(string) (String_Builder)
-
 typedef struct {
     char *items[32];
     size_t count;
 } Fixed_Str_Array;
+
+typedef enum {
+    TECHNOLOGY,
+    HISTORY,
+    CATASTORPHY,
+} Event_Kind;
+
+typedef enum {
+    N,
+    R,
+    UR,
+    SR,
+    SSR,
+} Frequency;
+
+typedef struct {
+    double delta_count;
+    double delta_grow_rate;
+    double delta_energy;
+    double delta_consume_rate;
+    Resource_Kind kind;
+} Event_Effect;
+
+typedef struct {
+    uint32_t items[32];
+    size_t count;
+} Effect_Id_Array;
+
+typedef struct {
+    Event_Effect items[32];
+    size_t count;
+} Event_Effect_Array;
+
+typedef struct {
+    uint32_t id;
+    Event_Kind kind;
+    String_View name;
+    String_View description;
+    Event_Effect_Array effects;
+} Event;
+
+typedef struct {
+    // TODO: How to check this?
+    // Using dict?
+    // matrix?
+    struct {
+        Event event;
+        Effect_Id_Array prereqs;
+        Effect_Id_Array unlocks;
+        Effect_Id_Array confilcts;
+        Effect_Id_Array synergies;
+    } items[200];
+    size_t count;
+} Event_Causal_Web;
 
 struct {
     int fps;
@@ -59,6 +111,7 @@ struct {
     // old arena would live one more frame
     Fixed_Str_Array preserved_arena;
     Fixed_Str_Array tofree_arena;
+    Event_Causal_Web events;
 } game_ctx = {
     .resource = {
 #define X(res_name, ...) [res_name] = { .name = SVLIT(#res_name), __VA_ARGS__ },
@@ -67,15 +120,26 @@ struct {
     },
     .fps = 60,
     .time_unit = 3600, // 1 sec = 1 game hour
+    .events = {
+        .items = {
+            {
+                .event = {
+                    // .id = CLAY_ID("農業"),
+                    .kind = TECHNOLOGY,
+                    .name = SVLIT("農業"),
+        
+                },
+            }
+        }
+    }
 };
 
-Font load_font(char *file_name) {
-
+Font load_font(const char *file_name) {
     struct {
         int *items;
         size_t count;
         size_t capacity;
-    } code_points = {0};
+    } code_points = {};
 
     for (size_t i = 0; i < ARRAY_LEN(CLAY_UNICODE_BLOCKS); ++i) {
         Clay_UnicodeRange range = CLAY_UNICODE_BLOCKS[i];
@@ -235,6 +299,12 @@ void draw_bar(UV loc, UV size) {
 }
 
 
+Clay_Color hover_color(Resource_Kind kind) {
+    Color c = game_ctx.resource[kind].color;
+    c = Clay_Hovered() ? c : ColorAlpha(c, 0.7); 
+    return RAYLIB_COLOR_TO_CLAY_COLOR(c);
+}
+
 void game_render() {
     Clay_ElementData viewport_data = Clay_GetElementData(CLAY_ID("viewport"));
     if(!viewport_data.found) {
@@ -265,7 +335,7 @@ int main(void) {
     );
     Clay_Initialize(
         clay_arena,
-        (Clay_Dimensions){0},
+        (Clay_Dimensions){},
         (Clay_ErrorHandler){ handle_clay_errors }
     );    
     Clay_SetMeasureTextFunction(Raylib_MeasureTextUnicode, fonts);
@@ -273,8 +343,12 @@ int main(void) {
     
     int key_pressed = '?';
     bool open_tech_panel = false;
+    bool open_tech_upgrade_panel = false;
+    bool open_debug_panel = false;
     // Render
     while (!WindowShouldClose()) {
+        if (IsKeyPressed(KEY_T)) open_tech_panel = !open_tech_panel;
+        if (IsKeyPressed(KEY_U)) open_tech_upgrade_panel = !open_tech_upgrade_panel;
         game_frame_str_rewind();
         float dt = GetFrameTime();
         Clay_SetLayoutDimensions((Clay_Dimensions) {GetScreenWidth(), GetScreenHeight()});
@@ -324,6 +398,20 @@ int main(void) {
                     { .fontSize = 48, .textColor = DEFAULT_TEXT_COLOR }
                 );
             }
+            if (open_tech_panel) {
+                CLAY(
+                    CLAY_ID("tech"),
+                    {
+                        .backgroundColor = { 50, 80, 50, 255 },
+                        .layout = {
+                            .sizing = { CLAY_SIZING_FIXED(200), CLAY_SIZING_GROW(0) },
+                            .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                        }
+                    }
+                ){
+                    
+                }
+            }
             CLAY(
                 CLAY_ID("items_side_bar"),
                 {
@@ -340,7 +428,7 @@ int main(void) {
                 CLAY(
                     CLAY_ID("create_worker"),
                     {
-                        .backgroundColor = { 120, 120, 50, Clay_Hovered() ? 255 : 128 },
+                        .backgroundColor = hover_color(WORKER),
                         .layout = {
                             .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0, 75)},
                             .childAlignment = align_center,
@@ -362,7 +450,7 @@ int main(void) {
                 CLAY(
                     CLAY_ID("tree"),
                     {
-                        .backgroundColor = { 120, 120, 50, Clay_Hovered() ? 255 : 128 },
+                        .backgroundColor = hover_color(TREE),
                         .layout = {
                             .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_GROW(0, 75)},
                             .childAlignment = align_center,
@@ -382,80 +470,100 @@ int main(void) {
                     );
                 }
                 CLAY_AUTO_ID({ .layout = { .sizing = { .height = CLAY_SIZING_GROW(0) } } });
-                Clay_PointerData pointer = Clay_GetPointerState();
-                key_pressed = GetKeyPressed() ? GetCharPressed() : key_pressed;
-                CLAY_TEXT(
-                    game_frame_str("(x: %.0f, y: %.0f)", pointer.position.x, pointer.position.y),
-                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
-                );
-                CLAY_TEXT(
-                    game_frame_str("last pressed key: %c", key_pressed),
-                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
-                );
-                // BUG: the arena still failed when using mouse detect stringId
-                CLAY_TEXT(
-                    game_frame_str("Hovered Element:"),
-                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
-                );
-                Clay_ElementIdArray elements = Clay_GetPointerOverIds();
-                Clay_String element_name = elements.internalArray[elements.length-1].stringId;
-                uint32_t element_id = elements.internalArray[elements.length-1].id;
-                CLAY_TEXT(
-                    game_frame_str("%u, %.*s", element_id, element_name.length, element_name.chars),
-                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
-                );
-                CLAY_TEXT(
-                    game_frame_str("open_tech_panel = %s", open_tech_panel ? "true" : "false"),
-                    { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
-                );
-            }
-            if (IsKeyPressed(KEY_T)) open_tech_panel = !open_tech_panel;
-            if (open_tech_panel) {
                 CLAY(
-                    CLAY_ID("technology"),
+                    CLAY_ID("debug_panel"),
+                    {
+                       .layout = {
+                           // .sizing = { .width = CLAY_SIZING_GROW(0), .height = CLAY_SIZING_FIT() },
+                           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                       }, 
+                    }
+                ){
+                    CLAY_TEXT(
+                        CLAY_STRING("Debug Panel"),
+                        {
+                            .fontSize = 20,
+                            .textColor = DEFAULT_TEXT_COLOR,
+                        }
+                    );
+                    Clay_PointerData pointer = Clay_GetPointerState();
+                    key_pressed = GetKeyPressed() ? GetCharPressed() : key_pressed;
+                    CLAY_TEXT(
+                        game_frame_str("(x: %.0f, y: %.0f)", pointer.position.x, pointer.position.y),
+                        { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
+                    );
+                    CLAY_TEXT(
+                        game_frame_str("frame str arena = %zu", game_ctx.frame_str_arena.capacity),
+                        { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
+                    );
+                    CLAY_TEXT(
+                        game_frame_str("last pressed key: %c", key_pressed),
+                        { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
+                    );
+                    CLAY_TEXT(
+                        game_frame_str("Hovered Element:"),
+                        { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
+                    );
+                    Clay_ElementIdArray elements = Clay_GetPointerOverIds();
+                    Clay_String element_name = elements.internalArray[elements.length-1].stringId;
+                    uint32_t element_id = elements.internalArray[elements.length-1].id;
+                    CLAY_TEXT(
+                        game_frame_str("%u, %.*s", element_id, element_name.length, element_name.chars),
+                        { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR , .wrapMode = CLAY_TEXT_WRAP_NONE }
+                    );
+                    CLAY_TEXT(
+                        game_frame_str("open_tech_panel = %s", open_tech_panel ? "true" : "false"),
+                        { .fontSize = 16, .textColor = DEFAULT_TEXT_COLOR }
+                    );
+                }
+            }
+            if (open_tech_upgrade_panel) {
+                CLAY(
+                    CLAY_ID("tech_upgrade"),
                     {
                         .floating = {
                             .attachTo = CLAY_ATTACH_TO_PARENT,
                             // .attachPoints = { .parent = CLAY_ATTACH_POINT_CENTER_CENTER },
                             .attachPoints = { .parent = CLAY_ATTACH_POINT_LEFT_TOP },
                         },
-                        .backgroundColor = { 50, 80, 50, 200 },
+                        .backgroundColor = { 50, 80, 80, 100 },
                         .layout = {
                             .sizing = layout_expand,
-                            .padding = CLAY_PADDING_ALL(20),
-                            .childGap = 8,
+                            .padding = CLAY_PADDING_ALL(100),
+                            .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
                         },
                     }
                 ){
-                    for (uint32_t i = 0; i < 20; ++i) {
-                        CLAY(
-                            CLAY_SID(game_frame_str("col-%u", i)),
-                            {
-                                .layout = {
-                                    .sizing = layout_expand,
-                                    .childGap = 8,
-                                    .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                    CLAY_AUTO_ID({
+                        .layout = {
+                            .sizing = {CLAY_SIZING_FIXED(620), CLAY_SIZING_FIXED(240)},
+                            .childGap = 20,
+                        }                     
+                    }) {
+                        for (uint32_t i = 0; i < 4; ++i) {
+                            CLAY(
+                                CLAY_SID(game_frame_str("card-%u", i)),
+                                {
+                                    .backgroundColor = { 50, 90, 90, 255 },
+                                    .layout = {
+                                        .sizing = layout_expand,
+                                        .childGap = 4,
+                                        .layoutDirection = CLAY_TOP_TO_BOTTOM,
+                                    },
+                                    .cornerRadius = CLAY_CORNER_RADIUS(16),
                                 }
-                            }
-                        ) {
-                            for (uint32_t j = 0; j < 20; ++j) {
-                                CLAY(
-                                    CLAY_SID(game_frame_str("(%u,%u)", i, j)),
-                                    {
-                                        .layout = {
-                                            .sizing = layout_expand
-                                        },
-                                        .backgroundColor = { 50, 50, 80, 100 },
-                                        .border = { { .a = 255 }, CLAY_BORDER_ALL(1) },
-                                    }
-                                );
-                            
+                            ) {
+                                
                             }
                         }
+                        
                     }
-            
                 }
             }
+        }
+        if (IsKeyPressed(KEY_G)) {
+            open_debug_panel = !open_debug_panel;
+            Clay_SetDebugModeEnabled(open_debug_panel);
         }
         Clay_RenderCommandArray ui = Clay_EndLayout(dt);
 
